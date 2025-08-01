@@ -22,6 +22,7 @@ export default function Lista() {
   const [filtroPorMes, setFiltroPorMes] = useState('');
   const [showModal, setShowModal] = useState(false);
   const [transacaoAtual, setTransacaoAtual] = useState(null);
+  const [showFiltros, setShowFiltros] = useState(false);
 
   useEffect(() => {
     if (!currentUser) return;
@@ -122,51 +123,66 @@ export default function Lista() {
           </div>
         </div>
       </div>
-      {}
-      <div className="bg-white p-4 rounded-xl shadow space-y-3">
-        <div className="flex flex-col sm:flex-row gap-2">
-          <select
-            className="border rounded px-3 py-2 text-sm"
-            value={filtroPorTipo}
-            onChange={(e) => setFiltroPorTipo(e.target.value)}
-          >
-            <option value="">Todos </option>
-            <option value="receita">Receita</option>
-            <option value="despesa">Despesa</option>
-          </select>
-
-          <select
-            className="border rounded px-3 py-2 text-sm"
-            value={filtroPorCategoria}
-            onChange={(e) => setFiltroPorCategoria(e.target.value)}
-          >
-            <option value="">Todas as Categorias</option>
-            <option value="Alimentação">Alimentação</option>
-            <option value="Transporte">Transporte</option>
-            <option value="Lazer">Lazer</option>
-            <option value="Outro">Outro</option>
-          </select>
-
-          <input
-            type="month"
-            className="border rounded px-3 py-2 text-sm"
-            value={filtroPorMes}
-            min="1900-01"
-            max="2100-12"
-            onChange={(e) => setFiltroPorMes(e.target.value)}
-          />
-        </div>
-
+      {/* Botão de Filtro */}
+      <div className="bg-white p-4 rounded-xl shadow">
         <button
-          onClick={() => {
-            setFiltroPorCategoria('');
-            setFiltroPorMes('');
-            setFiltroPorTipo('');
-          }}
-          className="bg-blue-500 text-white p-3 rounded-full px-5 py-3 w-full text-sm hover:bg-blue-600"
+          onClick={() => setShowFiltros(!showFiltros)}
+          className="bg-gray-100 hover:bg-gray-200 text-gray-700 px-4 py-2 rounded-lg text-sm font-medium flex items-center gap-2 transition-colors"
         >
-          Limpar filtros
+          🔍 Filtro
+          <span className={`transform transition-transform ${showFiltros ? 'rotate-180' : ''}`}>
+            ▼
+          </span>
         </button>
+        
+        {/* Opções de Filtro */}
+        {showFiltros && (
+          <div className="mt-4 space-y-3 border-t pt-4">
+            <div className="flex flex-col sm:flex-row gap-2">
+              <select
+                className="border rounded px-3 py-2 text-sm"
+                value={filtroPorTipo}
+                onChange={(e) => setFiltroPorTipo(e.target.value)}
+              >
+                <option value="">Todos </option>
+                <option value="receita">Receita</option>
+                <option value="despesa">Despesa</option>
+              </select>
+
+              <select
+                className="border rounded px-3 py-2 text-sm"
+                value={filtroPorCategoria}
+                onChange={(e) => setFiltroPorCategoria(e.target.value)}
+              >
+                <option value="">Todas as Categorias</option>
+                <option value="Alimentação">Alimentação</option>
+                <option value="Transporte">Transporte</option>
+                <option value="Lazer">Lazer</option>
+                <option value="Outro">Outro</option>
+              </select>
+
+              <input
+                type="month"
+                className="border rounded px-3 py-2 text-sm"
+                value={filtroPorMes}
+                min="1900-01"
+                max="2100-12"
+                onChange={(e) => setFiltroPorMes(e.target.value)}
+              />
+            </div>
+
+            <button
+              onClick={() => {
+                setFiltroPorCategoria('');
+                setFiltroPorMes('');
+                setFiltroPorTipo('');
+              }}
+              className="bg-blue-500 text-white p-3 rounded-lg px-5 py-2 w-full text-sm hover:bg-blue-600 transition-colors"
+            >
+              Limpar filtros
+            </button>
+          </div>
+        )}
       </div>
 
       {}
