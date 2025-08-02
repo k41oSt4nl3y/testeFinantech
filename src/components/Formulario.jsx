@@ -50,57 +50,50 @@ export default function Formulario({
         categoria: transacaoAtual.categoria,
       });
     } else {
-      setForm(formInicial);
+      const agora = new Date();
+      const dataHoje = agora.toISOString().split('T')[0];
+      const horaAgora = agora.toLocaleTimeString('pt-BR', {
+        hour: '2-digit',
+        minute: '2-digit',
+      });
+
+      setForm({ ...formInicial, data: dataHoje, hora: horaAgora });
     }
   }, [transacaoAtual]);
 
-  const handleSubmit = async (e) => {
+  const criarTimestamp = (data, hora) => {
+    const dataHora = new Date(`${data}T${hora}:00`);
+    return dataHora;
+  };
+
+  const lidarComEnvio = async (e) => {
     e.preventDefault();
 
-    if (!form.descricao.trim()) {
-      alert('Por favor, preencha a descrição da transação.');
+    if (!form.descricao.trim() || !form.valor) {
+      showError('Preencha todos os campos obrigatórios!');
       return;
     }
 
-    if (
-      !form.valor ||
-      isNaN(parseFloat(form.valor)) ||
-      parseFloat(form.valor) < 0
-    ) {
-      alert('Por favor, insira um valor válido (maior ou igual a zero).');
+    const valor = parseFloat(form.valor);
+    if (isNaN(valor) || valor <= 0) {
+      showError('Digite um valor válido!');
       return;
     }
-
-    if (form.data) {
-      const [ano] = form.data.split('-');
-      if (ano.length > 4 || parseInt(ano) < 1 || parseInt(ano) > 9999) {
-        alert('Por favor, insira um ano válido entre 1 e 9999.');
-        return;
-      }
-    }
-
-    let dataHoraCompleta;
-    if (form.data) {
-      const [ano, mes, dia] = form.data.split('-');
-      const [horas, minutos] = (form.hora || '00:00').split(':');
-      dataHoraCompleta = new Date(ano, mes - 1, dia, horas, minutos);
-    } else {
-      dataHoraCompleta = serverTimestamp();
-    }
-
-    const dadosTransacao = {
-      tipo: form.tipo,
-      descricao: form.descricao.trim(),
-      categoria: form.categoria,
-      valor: parseFloat(form.valor),
-      timestamp: dataHoraCompleta,
-      userId: currentUser.uid,
-    };
 
     try {
+      const dadosTransacao = {
+        tipo: form.tipo,
+        descricao: form.descricao.trim(),
+        valor: valor,
+        categoria: form.categoria,
+        timestamp: form.data && form.hora
+          ? criarTimestamp(form.data, form.hora)
+          : serverTimestamp(),
+        userId: currentUser.uid,
+      };
+
       if (transacaoAtual) {
-        const ref = doc(db, 'transacoes', transacaoAtual.id);
-        await updateDoc(ref, dadosTransacao);
+        await updateDoc(doc(db, 'transacoes', transacaoAtual.id), dadosTransacao);
         showSuccess('Transação atualizada com sucesso!');
       } else {
         await addDoc(collection(db, 'transacoes'), dadosTransacao);
@@ -116,116 +109,173 @@ export default function Formulario({
     }
   };
 
+  const lidarComCancelamento = () => {
+    setForm(formInicial);
+    setTransacaoAtual(null);
+    setShowModal(false);
+  };
+
+  if (!showModal) return null;
+
   return (
-    <div
-      className={`fixed inset-0 bg-black/30 z-50 flex items-center justify-center ${
-        showModal ? '' : 'hidden'
-      }`}
-      onClick={() => setShowModal(false)}
-    >
-      <form
-        onSubmit={handleSubmit}
-        onClick={(e) => e.stopPropagation()}
-        className="bg-white p-6 rounded-2xl shadow-xl w-full max-w-md space-y-4"
-      >
-        <h2 className="text-2xl font-bold text-gray-800 text-center">
-          {transacaoAtual ? 'Editar Transação' : 'Nova Transação'}
-        </h2>
-
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col">
-            <label className="text-sm font-medium text-gray-600">Tipo</label>
-            <select
-              className="border rounded px-3 py-2"
-              value={form.tipo}
-              onChange={(e) => setForm({ ...form, tipo: e.target.value })}
+    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center p-4 z-50">
+      <div className="bg-white rounded-2xl shadow-2xl max-w-lg w-full max-h-[90vh] overflow-y-auto">
+        <div className="p-6 lg:p-8">
+          {/* Header */}
+          <div className="flex items-center justify-between mb-6">
+            <h2 className="text-2xl lg:text-3xl font-bold text-gray-900 flex items-center gap-2">
+              <span>{transacaoAtual ? '✏️' : '➕'}</span>
+              {transacaoAtual ? 'Editar Transação' : 'Nova Transação'}
+            </h2>
+            <button
+              onClick={lidarComCancelamento}
+              className="text-gray-400 hover:text-gray-600 transition-colors p-1"
             >
-              <option value="receita">Receita</option>
-              <option value="despesa">Despesa</option>
-            </select>
+              <span className="text-2xl">×</span>
+            </button>
           </div>
 
-          <div className="flex flex-col">
-            <label className="text-sm font-medium text-gray-600">Data</label>
-            <input
-              type="date"
-              className="border rounded px-3 py-2"
-              value={form.data}
-              min="1900-01-01"
-              max="2100-12-31"
-              onChange={(e) => setForm({ ...form, data: e.target.value })}
-            />
-          </div>
-        </div>
+          <form onSubmit={lidarComEnvio} className="space-y-6">
+            {/* Tipo de Transação */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-3">
+                Tipo de Transação
+              </label>
+              <div className="grid grid-cols-2 gap-3">
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, tipo: 'receita' })}
+                  className={`p-4 rounded-xl font-medium transition-all duration-300 border-2 ${
+                    form.tipo === 'receita'
+                      ? 'bg-emerald-500 text-white border-emerald-500 shadow-lg'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-lg">💰</span>
+                    <span>Receita</span>
+                  </div>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setForm({ ...form, tipo: 'despesa' })}
+                  className={`p-4 rounded-xl font-medium transition-all duration-300 border-2 ${
+                    form.tipo === 'despesa'
+                      ? 'bg-red-500 text-white border-red-500 shadow-lg'
+                      : 'bg-gray-50 text-gray-700 border-gray-200 hover:bg-gray-100'
+                  }`}
+                >
+                  <div className="flex items-center justify-center gap-2">
+                    <span className="text-lg">💸</span>
+                    <span>Despesa</span>
+                  </div>
+                </button>
+              </div>
+            </div>
 
-        <div className="flex flex-col">
-          <label className="text-sm font-medium text-gray-600">Hora</label>
-          <input
-            type="time"
-            className="border rounded px-3 py-2"
-            value={form.hora}
-            onChange={(e) => setForm({ ...form, hora: e.target.value })}
-          />
-        </div>
+            {/* Descrição */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Descrição *
+              </label>
+              <input
+                type="text"
+                value={form.descricao}
+                onChange={(e) => setForm({ ...form, descricao: e.target.value })}
+                placeholder="Ex: Salário, Almoço, Gasolina..."
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all placeholder-gray-400"
+                required
+              />
+            </div>
 
-        <div className="flex flex-col">
-          <label className="text-sm font-medium text-gray-600">Descrição</label>
-          <input
-            type="text"
-            className="border rounded px-3 py-2"
-            placeholder="Ex: Salário, Conta de Luz"
-            value={form.descricao}
-            onChange={(e) => setForm({ ...form, descricao: e.target.value })}
-          />
-        </div>
+            {/* Valor */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Valor (R$) *
+              </label>
+              <div className="relative">
+                <span className="absolute left-4 top-1/2 transform -translate-y-1/2 text-gray-500 font-medium">
+                  R$
+                </span>
+                <input
+                  type="number"
+                  step="0.01"
+                  min="0"
+                  value={form.valor}
+                  onChange={(e) => setForm({ ...form, valor: e.target.value })}
+                  placeholder="0,00"
+                  className="w-full border border-gray-300 rounded-xl pl-12 pr-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all placeholder-gray-400"
+                  required
+                />
+              </div>
+            </div>
 
-        <div className="grid grid-cols-2 gap-4">
-          <div className="flex flex-col">
-            <label className="text-sm font-medium text-gray-600">Valor</label>
-            <input
-              type="number"
-              min="0"
-              step="0.01"
-              className="border rounded px-3 py-2"
-              value={form.valor}
-              onChange={(e) => setForm({ ...form, valor: e.target.value })}
-            />
-          </div>
+            {/* Categoria */}
+            <div>
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                Categoria
+              </label>
+              <select
+                value={form.categoria}
+                onChange={(e) => setForm({ ...form, categoria: e.target.value })}
+                className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+              >
+                <option value="Alimentação">🍽️ Alimentação</option>
+                <option value="Transporte">🚗 Transporte</option>
+                <option value="Lazer">🎮 Lazer</option>
+                <option value="Outro">📋 Outro</option>
+              </select>
+            </div>
 
-          <div className="flex flex-col">
-            <label className="text-sm font-medium text-gray-600">
-              Categoria
-            </label>
-            <select
-              className="border rounded px-3 py-2"
-              value={form.categoria}
-              onChange={(e) => setForm({ ...form, categoria: e.target.value })}
-            >
-              <option value="Alimentação">Alimentação</option>
-              <option value="Transporte">Transporte</option>
-              <option value="Lazer">Lazer</option>
-              <option value="Saúde">Saúde</option>
-              <option value="Outro">Outro</option>
-            </select>
-          </div>
-        </div>
+            {/* Data e Hora */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Data
+                </label>
+                <input
+                  type="date"
+                  value={form.data}
+                  onChange={(e) => setForm({ ...form, data: e.target.value })}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+              </div>
+              <div>
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  Hora
+                </label>
+                <input
+                  type="time"
+                  value={form.hora}
+                  onChange={(e) => setForm({ ...form, hora: e.target.value })}
+                  className="w-full border border-gray-300 rounded-xl px-4 py-3 focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
+                />
+              </div>
+            </div>
 
-        <div className="flex justify-between gap-4 pt-2">
-          <button
-            type="submit"
-            className="bg-blue-600 hover:bg-blue-700 text-white font-medium px-4 py-2 rounded w-full transition"
-          >
-            {transacaoAtual ? 'Atualizar' : 'Adicionar'}
-          </button>
-          <button
-            type="button"
-            onClick={() => setShowModal(false)}
-            className="bg-gray-300 hover:bg-gray-400 text-gray-700 font-medium px-4 py-2 rounded w-full transition"
-          >
-            Cancelar
-          </button>
+            {/* Botões */}
+            <div className="flex flex-col sm:flex-row gap-3 pt-4">
+              <button
+                type="button"
+                onClick={lidarComCancelamento}
+                className="flex-1 bg-gray-100 hover:bg-gray-200 text-gray-700 px-6 py-3 rounded-xl font-semibold transition-all duration-300"
+              >
+                Cancelar
+              </button>
+              <button
+                type="submit"
+                className={`flex-1 text-white px-6 py-3 rounded-xl font-semibold transition-all duration-300 shadow-lg ${
+                  form.tipo === 'receita'
+                    ? 'bg-emerald-500 hover:bg-emerald-600'
+                    : 'bg-red-500 hover:bg-red-600'
+                }`}
+              >
+                {transacaoAtual ? 'Atualizar' : 'Adicionar'} {form.tipo}
+              </button>
+            </div>
+          </form>
         </div>
-      </form>
+      </div>
     </div>
   );
 }
